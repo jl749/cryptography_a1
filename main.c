@@ -38,7 +38,7 @@ int find(char* decrypt){
     return 0;
 }
 
-void caesarCipher(char* arr,int len){
+void caesarCipher(char* arr){
     int i,j;
     for(i=1;i<27;i++){  //alphabets
         char str[MAX_STRING_LEN]="";
@@ -56,13 +56,28 @@ void caesarCipher(char* arr,int len){
     }
 }
 
+void vigenereCipher(char* arr,char* key){
+    int i;
+    for(i=0;i<strlen(arr)-1;i++){
+        int c=(arr[i]-65)-(key[i%strlen(key)]-65);
+        if(c < 0)
+            c+=26;
+        arr[i]=c%26+65;
+    }
+    printf("%s\n",arr);
+}
+
 int main()
 {
     /*q1*/
     char* arr=readFile("cexercise1.txt");
-    caesarCipher(arr,strlen(arr));
+    caesarCipher(arr);
 
     /*q2*/
+    char* key="TESSOFTHEDURBERVILLES";
+    arr=readFile("cexercise2.txt");
+    vigenereCipher(arr,key);
 
+    /*q3*/
     return 0;
 }
