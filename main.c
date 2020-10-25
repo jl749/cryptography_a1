@@ -2,11 +2,33 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MAX_PATTERNS 100
 #define MAX_KEY_LEN 100
 #define MAX_STRING_LEN 841 //cipher files containing \n at the end --> 840+1
 
 const char alpEnd=90;   //ascii Z
 const char alpStart=65; //ascii A
+FILE* plainTXTpt;
+
+FILE* readPlainTXT(char* fname){
+    FILE* fp=fopen(fname,"rt");
+    if(fp==NULL){
+        puts("error occurred while trying to create stream");
+        return -1;
+    }
+    return fp;
+}
+long calFileSize(FILE* fp){
+    long fpos=ftell(fp); //to be safe
+    long size;
+
+    fseek(fp,0,SEEK_END); //move pointer to the end of file
+    size=ftell(fp); //ftell returns current location (bytes)
+
+    fseek(fp,fpos,SEEK_SET); //RESET pointer
+
+    return size;
+}
 
 char* readFile(char* fname){
     FILE* fp=fopen(fname,"rt");
@@ -20,12 +42,9 @@ char* readFile(char* fname){
     fclose(fp);
     return str;
 }
-int find(char* decrypt){
-    FILE* fp=fopen("tess26.txt","rt");  long curr=0; //initial file offset
-    if(fp==NULL){
-        puts("error occurred while trying to create stream");
-        return -1;
-    }
+int find(char* decrypt,FILE* fp){
+    long curr=0; //initial file offset
+
     char str[MAX_STRING_LEN*2]; //going to save 2 lines
     char nxtln[MAX_STRING_LEN];
     while(fgets(str,MAX_STRING_LEN,fp)!=NULL){  //fgets always add \0 at the end
@@ -35,11 +54,13 @@ int find(char* decrypt){
 
         fseek(fp,curr,SEEK_SET); //offset retrieve 1 line
         if(strstr(str,decrypt)){
-            fclose(fp);
+            fseek(fp,0,SEEK_SET); //reset file pointer
+            //fclose(fp);
             return 1;
         }
     }
-    fclose(fp);
+    fseek(fp,0,SEEK_SET);
+    //fclose(fp);
     return 0;
 }
 
@@ -53,7 +74,7 @@ void caesarCipher(char* arr){
             strncat(str,&c,1);  //append char to string
         }
         strncpy(sample,str,100);    //strncpy does not copy string terminator
-        if(find(sample)){
+        if(find(sample,plainTXTpt)){
             printf("shift: %d\n",i);
             printf("decrypted msg: %s\n",str);
             return;
@@ -71,10 +92,58 @@ void vigenereCipher(char* arr,char* key){   //input arr must be string
     }
     char sample[strlen(arr)];
     strncpy(sample,arr,strlen(arr)-1);  //-1 to avoid \n
-    if(find(sample)){
+    if(find(sample,plainTXTpt)){
         printf("key: %s\n",key);
         printf("decrypted msg: %s\n",arr);
     }
+}
+
+void findPatterns(char* fname,int keyLen){
+    FILE* fp=fopen(fname,"rt");
+    if(fp==NULL){
+        puts("error occurred while trying to create stream");
+        return -1;
+    }
+    long size=calFileSize(fp);
+
+    int i,j,k;
+    char** str=(char**)malloc(sizeof(char*)*((int)size/6+1)); //2D array
+    for(i=0;i<=(int)size/6;i++)
+        str[i]=(char*)malloc(keyLen+1);
+
+    for(i=0;i<=(int)size/6;i++)
+        fgets(str[i],keyLen+1,fp);
+
+    char patterns[MAX_PATTERNS][10]; int top=0;
+    char* ptr;  char the[4]="the";
+    for(i=0;i<=(int)size/6;i++){  //loop 2D array rows
+        ptr=str[i];
+        for(j=0;j<=keyLen-3;j++){    //loop columns
+            int count=0;
+            strncpy(the,ptr+j,3);
+            if(strlen(the)!=3)  //trying to look for THE
+                continue;
+
+            for(k=0;k<=(int)size/6;k++)
+                if(strstr(*(str+k)+j,the)) //look for match
+                    count++;
+            if(count>=2){
+                int flag=0;
+                for(k=0;k<top;k++){
+                    if(strncmp(patterns[k],the,3)==0){
+                        flag=1; //it is duplicate pattern
+                        break;
+                    }
+                }
+                if(!flag)
+                    strcpy(patterns[top++],the);
+            }
+        }
+    }
+    puts("<PATTERNS FOUND>");
+    for(i=0;i<top;i++)
+        printf("%5s",patterns[i]);
+    //freee
 }
 
 void convertCarry(char* key){
@@ -87,28 +156,34 @@ void convertCarry(char* key){
         }
     }
 }
-void decryptKey(char* arr,int keyLen){
-    int i;
-    char key[MAX_KEY_LEN]=""; //variable sized obj may not be initialized
-    for(i=0;i<keyLen;i++)
-        strncat(key,&alpStart,1); //strcat null terminator always
+void decryptKey(char* arr,char* key,int* indexToFill,int r){
+    int i,j;  int unknownspace=r;
 
+    char startkey[MAX_KEY_LEN]="";  //variable sized obj not allowed
+    for(i=0;i<unknownspace;i++)
+        strncat(startkey,&alpStart,1);
     char endkey[MAX_KEY_LEN]="";
-    for(i=0;i<keyLen;i++)
+    for(i=0;i<unknownspace;i++)
         strncat(endkey,&alpEnd,1);
 
-    while(strcmp(key,endkey)){ //while key is not endkey
+    char mergedKey[MAX_KEY_LEN]="";
+    strcat(mergedKey,key);
+    while(startkey[strlen(startkey)-1]!=alpEnd+1){ //while key is not endkey
         for(i=0;i<26;i++){
-                puts(key);
-            vigenereCipher(arr,key);
-            key[0]+=1;   //at the end key=']'
+            for(j=0;j<unknownspace;j++)
+                mergedKey[indexToFill[j]]=startkey[j];
+            puts(mergedKey);
+
+            vigenereCipher(arr,mergedKey);
+            startkey[0]+=1;   //at the end key=']'
         }
-        convertCarry(key);
+        convertCarry(startkey);
     }
 }
 
 int main()
 {
+    plainTXTpt=readPlainTXT("tess26.txt");
     /*q1*/puts("---EXERCISE 1---");
     char* arr=readFile("cexercise1.txt");
     caesarCipher(arr);
@@ -119,7 +194,16 @@ int main()
     vigenereCipher(arr,key);
 
     /*q3*/puts("---EXERCISE 3---");
+    findPatterns("cexercise3.txt",6);
     arr=readFile("cexercise3.txt");
-    decryptKey(arr,6);
+
+    //int unknownIndexes[]={0,4,5};     //STT
+    //decryptKey(arr,"AZMPAA",unknownIndexes,3);
+    //int unknownIndexes[]={3,4,5};     //NSP
+    //decryptKey(arr,"ULLAAA",unknownIndexes,3);
+    //int unknownIndexes[]={0,1,5};     //PMF
+    //decryptKey(arr,"AAWTBA",unknownIndexes,3);
+    //int unknownIndexes[]={0,4,5};     //RPM
+    //decryptKey(arr,"AYIIAA",unknownIndexes,3);
     return 0;
 }
