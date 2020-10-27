@@ -2,11 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MIN_COUNT_TO_BE_PATTERN 3
 #define MAX_PATTERN_LEN 10   //HAVE, THAT, BE, ARE, IS, AND, THE ....
 #define MAX_PATTERNS 100
 #define MAX_KEY_LEN 100
-#define MAX_STRING_LEN 841 //cipher files containing \n at the end --> 840+1
+#define MAX_STRING_LEN 842 //cipher files containing \n at the end --> 840+1
 
 const char alpEnd=90;   //ascii Z
 const char alpStart=65; //ascii A
@@ -90,24 +89,26 @@ void caesarCipher(char* arr){
 }
 
 int vigenereCipher(char* arr,char* key){   //input arr must be string
-    int i;
+    int i;  char tmp[MAX_STRING_LEN];
+    strcpy(tmp,arr);
     for(i=0;i<strlen(arr)-1;i++){
-        int c=(arr[i]-65)-(key[i%strlen(key)]-65);
+        int c=(tmp[i]-65)-(key[i%strlen(key)]-65);
         if(c < 0)   //instead of modulo operation
             c+=26;
-        arr[i]=c%26+65;
+        tmp[i]=c%26+65;
     }
     char sample[30];
-    strncpy(sample,arr,30);  //-1 to avoid \n
+    strncpy(sample,tmp,30);
     if(find(sample,plainTXTpt)){
+            puts("");
         printf("key: %s\n",key);
-        printf("decrypted msg: %s\n",arr);
+        printf("decrypted msg: %s\n",tmp);
         return 1;
     }
     return 0;
 }
 
-PATTERNS* findPatterns(char* fname,int keyLen,int patternLen){
+PATTERNS* findPatterns(char* fname,int keyLen,int patternLen,int minCount){
     FILE* fp=fopen(fname,"rt");
     if(fp==NULL){
         puts("error occurred while trying to create stream");
@@ -138,7 +139,7 @@ PATTERNS* findPatterns(char* fname,int keyLen,int patternLen){
                 if(strstr(*(str+k)+j,the)) //look for match
                     count++;
 
-            if(count>=MIN_COUNT_TO_BE_PATTERN){
+            if(count>=minCount){
                 int flag=0;
                 for(k=0;k<top;k++){
                     if(strncmp(patterns[k].patterns,the,patternLen)==0){
@@ -230,10 +231,14 @@ int main()
     vigenereCipher(arr,key);
 
     /*q3*/puts("---EXERCISE 3---");
+    /**     <how to use decryptKey function using q2 example>
+        int testidx[]={2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29};
+        decryptKey(arr,"SSOFTHEDURBERVILLES",testidx,2);
+    **/
     arr=readFile("cexercise3.txt");
     int keyLen=6;
-    char* plaintxt="THE"; //plain text to be substituted by patterns tested
-    PATTERNS* patterns=findPatterns("cexercise3.txt",keyLen,strlen(plaintxt)); //for each patterns it takes about 190 sec to test all possibilities
+    char* plaintxt="THAT"; //plain text to be substituted by patterns tested
+    PATTERNS* patterns=findPatterns("cexercise3.txt",keyLen,strlen(plaintxt),2); //check define to change thresholds for pattern matching
 
     //PRINT PATTERNS
     int i,j;    puts("<patterns found>");
@@ -241,10 +246,36 @@ int main()
         printf("%s: {",patterns[i].patterns);
         for(j=0; j<strlen(plaintxt) ;j++)
             printf(" %d ",patterns[i].indexes[j]);
-        printf("}              ");
+        printf("}\n");
     }puts("");
 
-    for(int i=0; strcmp(patterns[i].patterns,"") && i!=MAX_PATTERNS ;i++){
+    for(int i=0; strcmp(patterns[i].patterns,"") && i!=MAX_PATTERNS ;i++){  //FOR EVERY ELEMENT IN PATTERN ARRAY
+        //printf("%s: {%d %d %d}\n",patterns[i].patterns,patterns[i].indexes[0],patterns[i].indexes[1],patterns[i].indexes[2]);
+        char* suspectedKey=keyFrom(patterns[i].patterns,plaintxt);
+        printf("substituting ciphertxt(%s) on plaintxt(%s)\n",patterns[i].patterns,plaintxt);
+        if(decryptKey(arr,suspectedKey,patterns[i].indexes,keyLen-strlen(plaintxt))){
+            free(suspectedKey);
+            break;
+        }
+        free(suspectedKey);
+    }
+
+    /*q4*/puts("---EXERCISE 4---");
+    arr=readFile("cexercise4.txt");
+    keyLen=4;
+    plaintxt="THE"; //plain text to be substituted by patterns tested
+    patterns=findPatterns("cexercise4.txt",keyLen,strlen(plaintxt),5); //check define to change thresholds for pattern matching
+
+    //PRINT PATTERNS
+    puts("<patterns found>");
+    for(i=0; strcmp(patterns[i].patterns,"") && i!=MAX_PATTERNS ;i++){
+        printf("%s: {",patterns[i].patterns);
+        for(j=0; j<strlen(plaintxt) ;j++)
+            printf(" %d ",patterns[i].indexes[j]);
+        printf("}\n");
+    }puts("");
+
+    for(int i=0; strcmp(patterns[i].patterns,"") && i!=MAX_PATTERNS ;i++){  //FOR EVERY ELEMENT IN PATTERN ARRAY
         //printf("%s: {%d %d %d}\n",patterns[i].patterns,patterns[i].indexes[0],patterns[i].indexes[1],patterns[i].indexes[2]);
         char* suspectedKey=keyFrom(patterns[i].patterns,plaintxt);
         printf("substituting ciphertxt(%s) on plaintxt(%s)\n",patterns[i].patterns,plaintxt);
