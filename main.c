@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MIN_COUNT_TO_BE_PATTERN 3
+#define MAX_PATTERN_LEN 10   //HAVE, THAT, BE, ARE, IS, AND, THE ....
 #define MAX_PATTERNS 100
 #define MAX_KEY_LEN 100
 #define MAX_STRING_LEN 841 //cipher files containing \n at the end --> 840+1
@@ -9,6 +11,11 @@
 const char alpEnd=90;   //ascii Z
 const char alpStart=65; //ascii A
 FILE* plainTXTpt;
+
+typedef struct{
+    int indexes[MAX_PATTERN_LEN];
+    char patterns[MAX_PATTERN_LEN];
+}PATTERNS;
 
 FILE* readPlainTXT(char* fname){
     FILE* fp=fopen(fname,"rt");
@@ -82,7 +89,7 @@ void caesarCipher(char* arr){
     }
 }
 
-void vigenereCipher(char* arr,char* key){   //input arr must be string
+int vigenereCipher(char* arr,char* key){   //input arr must be string
     int i;
     for(i=0;i<strlen(arr)-1;i++){
         int c=(arr[i]-65)-(key[i%strlen(key)]-65);
@@ -90,15 +97,17 @@ void vigenereCipher(char* arr,char* key){   //input arr must be string
             c+=26;
         arr[i]=c%26+65;
     }
-    char sample[strlen(arr)];
-    strncpy(sample,arr,strlen(arr)-1);  //-1 to avoid \n
+    char sample[30];
+    strncpy(sample,arr,30);  //-1 to avoid \n
     if(find(sample,plainTXTpt)){
         printf("key: %s\n",key);
         printf("decrypted msg: %s\n",arr);
+        return 1;
     }
+    return 0;
 }
 
-void findPatterns(char* fname,int keyLen){
+PATTERNS* findPatterns(char* fname,int keyLen,int patternLen){
     FILE* fp=fopen(fname,"rt");
     if(fp==NULL){
         puts("error occurred while trying to create stream");
@@ -107,43 +116,48 @@ void findPatterns(char* fname,int keyLen){
     long size=calFileSize(fp);
 
     int i,j,k;
-    char** str=(char**)malloc(sizeof(char*)*((int)size/6+1)); //2D array
-    for(i=0;i<=(int)size/6;i++)
+    char** str=(char**)malloc(sizeof(char*)*((int)size/keyLen)); //2D array
+    for(i=0;i<=(int)size/keyLen;i++)
         str[i]=(char*)malloc(keyLen+1);
 
-    for(i=0;i<=(int)size/6;i++)
+    for(i=0;i<=(int)size/keyLen;i++)
         fgets(str[i],keyLen+1,fp);
 
-    char patterns[MAX_PATTERNS][10]; int top=0;
-    char* ptr;  char the[4]="the";
-    for(i=0;i<=(int)size/6;i++){  //loop 2D array rows
+    PATTERNS* patterns=(PATTERNS*)malloc(MAX_PATTERNS*10); int top=0;
+    char* ptr;  //char the[patternLen+1]="";
+    char* the=(char*)malloc(patternLen+1);//any pattern found saved here
+    for(i=0;i<=(int)size/keyLen;i++){  //loop 2D array rows
         ptr=str[i];
-        for(j=0;j<=keyLen-3;j++){    //loop columns
+        for(j=0;j<=keyLen-patternLen;j++){    //loop columns
             int count=0;
-            strncpy(the,ptr+j,3);
-            if(strlen(the)!=3)  //trying to look for THE
+            strncpy(the,ptr+j,patternLen);
+            if(strlen(the)!=patternLen)  //trying to look for pattern that meets patternLen argument
                 continue;
 
-            for(k=0;k<=(int)size/6;k++)
+            for(k=0;k<=(int)size/keyLen;k++)
                 if(strstr(*(str+k)+j,the)) //look for match
                     count++;
-            if(count>=2){
+
+            if(count>=MIN_COUNT_TO_BE_PATTERN){
                 int flag=0;
                 for(k=0;k<top;k++){
-                    if(strncmp(patterns[k],the,3)==0){
+                    if(strncmp(patterns[k].patterns,the,patternLen)==0){
                         flag=1; //it is duplicate pattern
                         break;
                     }
                 }
-                if(!flag)
-                    strcpy(patterns[top++],the);
+                if(!flag){
+                    strcpy(patterns[top].patterns,the);
+                    for(k=0;k<strlen(the);k++)
+                        patterns[top].indexes[k]=j+k;
+                    top++;
+                }
             }
         }
     }
-    puts("<PATTERNS FOUND>");
-    for(i=0;i<top;i++)
-        printf("%5s",patterns[i]);
-    //freee
+    free(the);
+    free(str);
+    return patterns;
 }
 
 void convertCarry(char* key){
@@ -156,29 +170,51 @@ void convertCarry(char* key){
         }
     }
 }
-void decryptKey(char* arr,char* key,int* indexToFill,int r){
-    int i,j;  int unknownspace=r;
+int decryptKey(char* arr,char* key,int* fixedIndex,int r){ //r=unkownspaces
+    int i,j,tested=0;
 
     char startkey[MAX_KEY_LEN]="";  //variable sized obj not allowed
-    for(i=0;i<unknownspace;i++)
+    for(i=0;i<r;i++)
         strncat(startkey,&alpStart,1);
     char endkey[MAX_KEY_LEN]="";
-    for(i=0;i<unknownspace;i++)
+    for(i=0;i<r;i++)
         strncat(endkey,&alpEnd,1);
 
-    char mergedKey[MAX_KEY_LEN]="";
-    strcat(mergedKey,key);
+    char mergedKey[MAX_KEY_LEN];
+    for(i=0;i<strlen(key);i++)
+        mergedKey[fixedIndex[i]]=key[i];
+
     while(startkey[strlen(startkey)-1]!=alpEnd+1){ //while key is not endkey
         for(i=0;i<26;i++){
-            for(j=0;j<unknownspace;j++)
-                mergedKey[indexToFill[j]]=startkey[j];
-            puts(mergedKey);
+            int skip=0,take=0;  tested++;
+            for(j=0;j<r+strlen(key);j++){
+                if(j==fixedIndex[skip]){
+                    skip++;
+                    continue;
+                }
+                mergedKey[j]=startkey[take++];
+            }
+            printf("\r%s, %d tested so far",mergedKey,tested);
 
-            vigenereCipher(arr,mergedKey);
+            if(vigenereCipher(arr,mergedKey))
+                return 1;
             startkey[0]+=1;   //at the end key=']'
         }
         convertCarry(startkey);
+    }puts("");
+    return 0;
+}
+
+char* keyFrom(char* ciphertxt,char* plaintxt){  //ciphertxt + key  ->  "THE"
+    char* key=(char*)malloc(strlen(ciphertxt)+1);
+    int i;
+    for(i=0;i<strlen(ciphertxt);i++){
+        int shift=(ciphertxt[i]-65)-(plaintxt[i]-65);
+        if(shift < 0)   //instead of modulo operation
+            shift+=26;
+        key[i]=shift%26+65;
     }
+    return key;
 }
 
 int main()
@@ -194,16 +230,30 @@ int main()
     vigenereCipher(arr,key);
 
     /*q3*/puts("---EXERCISE 3---");
-    findPatterns("cexercise3.txt",6);
     arr=readFile("cexercise3.txt");
+    int keyLen=6;
+    char* plaintxt="THE"; //plain text to be substituted by patterns tested
+    PATTERNS* patterns=findPatterns("cexercise3.txt",keyLen,strlen(plaintxt)); //for each patterns it takes about 190 sec to test all possibilities
 
-    //int unknownIndexes[]={0,4,5};     //STT
-    //decryptKey(arr,"AZMPAA",unknownIndexes,3);
-    //int unknownIndexes[]={3,4,5};     //NSP
-    //decryptKey(arr,"ULLAAA",unknownIndexes,3);
-    //int unknownIndexes[]={0,1,5};     //PMF
-    //decryptKey(arr,"AAWTBA",unknownIndexes,3);
-    //int unknownIndexes[]={0,4,5};     //RPM
-    //decryptKey(arr,"AYIIAA",unknownIndexes,3);
+    //PRINT PATTERNS
+    int i,j;    puts("<patterns found>");
+    for(i=0; strcmp(patterns[i].patterns,"") && i!=MAX_PATTERNS ;i++){
+        printf("%s: {",patterns[i].patterns);
+        for(j=0; j<strlen(plaintxt) ;j++)
+            printf(" %d ",patterns[i].indexes[j]);
+        printf("}              ");
+    }puts("");
+
+    for(int i=0; strcmp(patterns[i].patterns,"") && i!=MAX_PATTERNS ;i++){
+        //printf("%s: {%d %d %d}\n",patterns[i].patterns,patterns[i].indexes[0],patterns[i].indexes[1],patterns[i].indexes[2]);
+        char* suspectedKey=keyFrom(patterns[i].patterns,plaintxt);
+        printf("substituting ciphertxt(%s) on plaintxt(%s)\n",patterns[i].patterns,plaintxt);
+        if(decryptKey(arr,suspectedKey,patterns[i].indexes,keyLen-strlen(plaintxt))){
+            free(suspectedKey);
+            break;
+        }
+        free(suspectedKey);
+    }
+
     return 0;
 }
