@@ -199,8 +199,65 @@ void printPatterns(PATTERNS* patterns){
     }puts("");
 }
 
+char* transPositionEncrypt(char* arr,int colLen,int* readOrder){
+    int size=strlen(arr)-1; //-1 for \n
+    int row=(size%colLen!=0)?size/colLen+1:size/colLen;
+
+    int txtAt=0;
+    char* transArr=(char*)calloc(row*colLen,sizeof(char));
+    int i,j;
+    for(i=0;i<row;i++){ //fills row by row
+        for(j=0;j<colLen;j++){
+            int index=colLen-1-j;  //index to read left -> right
+            transArr[index*row+i]=arr[txtAt++]; //[index][i] fill [3][0] [2][0] [1][0] [0][0] (left to right)
+        }
+    }
+
+    char* output=(char*)malloc(size);   output[0]=0; //initialize null (to navigate when strncat)
+    //read column by column
+    for(i=0;i<colLen;i++){
+        int index=readOrder[colLen-1-i];  //readOrder from behind, transform readOrder to index
+        for(j=0;j<row;j++){
+            char c=transArr[index*row+j]; //[index][j] get [3][0] [3][1] [3][2] .....
+            strncat(output,&c,1);
+        }
+    }
+
+    free(transArr);
+    return output;
+}
+
+char* transPositionDecrypt(char* arr,int colLen,int* readOrder){
+    int size=strlen(arr)-1; //-1 for \n
+    int row=(size%colLen!=0)?size/colLen+1:size/colLen;
+
+    int txtAt=0;
+    char* transArr=(char*)calloc(row*colLen,sizeof(char));
+    int i,j;
+    for(i=0;i<colLen;i++){ //fills each column
+        int index=colLen-1-i; // n... 3 2 1      LEFT->RIGHT
+        for(j=0;j<row;j++){
+            transArr[index*row+j]=arr[txtAt++];
+        }
+    }
+
+    char* output=(char*)malloc(size);   output[0]=0; //initialize null (to navigate when strncat)
+    //read row by row
+    for(i=0;i<row;i++){
+        for(j=0;j<colLen;j++){
+            int index=colLen-1-readOrder[j]; //convert readOrder to LEFT->RIGHT index
+            char c=transArr[index*row+i]; //[index][i], column read order? ex) 3(E) 1(T) 2(H)
+            strncat(output,&c,1);
+        }
+    }
+
+    free(transArr);
+    return output;
+}
+
 int main()
 {
+    int i;
     /*q1*/puts("---EXERCISE 1---");
     char* arr=readFile("cexercise1.txt");
     caesarCipher(arr);
@@ -220,7 +277,7 @@ int main()
 
     printPatterns(patterns4);
 
-    for(int i=0; strcmp(patterns4[i].patterns,"") && i!=MAX_PATTERNS ;i++){  //FOR EVERY ELEMENT IN PATTERN ARRAY
+    for(i=0; strcmp(patterns4[i].patterns,"") && i!=MAX_PATTERNS ;i++){  //FOR EVERY ELEMENT IN PATTERN ARRAY
         char* suspectedKey=keyFrom(patterns4[i].patterns,plaintxt); //assuming plaintxt matches pattern get corresponding key
         printf("\nsubstituting ciphertxt(%s) on plaintxt(%s), key=%s\n",patterns4[i].patterns,plaintxt,suspectedKey);
         decryptKey(arr,suspectedKey,patterns4[i].indexes,keyLen-strlen(plaintxt),minOccur);
@@ -230,19 +287,28 @@ int main()
 
     /*q4*/puts("---EXERCISE 4---");
     arr=readFile("cexercise4.txt");
-    keyLen=4;   minOccur=3; //too many for 2, increased threshold to 3
+    keyLen=4;   minOccur=5; //too many for 2, increased threshold to 3
     plaintxt="THE"; //plain text to be substituted on patterns
     PATTERNS* patterns3=findPatterns(arr,keyLen,strlen(plaintxt),minOccur); //save 3 letter patterns found here
 
     printPatterns(patterns3);
 
-    for(int i=0; strcmp(patterns3[i].patterns,"") && i!=MAX_PATTERNS ;i++){  //FOR EVERY ELEMENT IN PATTERN ARRAY
+    for(i=0; strcmp(patterns3[i].patterns,"") && i!=MAX_PATTERNS ;i++){  //FOR EVERY ELEMENT IN PATTERN ARRAY
         char* suspectedKey=keyFrom(patterns3[i].patterns,plaintxt); //assuming plaintxt matches pattern get corresponding key
         printf("\nsubstituting ciphertxt(%s) on plaintxt(%s), key=%s\n",patterns3[i].patterns,plaintxt,suspectedKey);
         decryptKey(arr,suspectedKey,patterns3[i].indexes,keyLen-strlen(plaintxt),minOccur);
 
         free(suspectedKey);
     }
+
+    /*q5*/puts("---EXERCISE 5---");
+    arr=readFile("cexercise5.txt");
+    keyLen=4;
+    int order[keyLen];
+    for(i=0;i<keyLen;i++)
+        order[i]=i;
+    char* decryptMsg=transPositionDecrypt(arr,keyLen,order);
+    puts(decryptMsg); free(decryptMsg);
 
     return 0;
 }
