@@ -241,7 +241,7 @@ char* transPositionDecrypt(char* arr,int colLen,int* readOrder){
         }
     }
 
-    char* output=(char*)malloc(size);   output[0]=0; //initialize null (to navigate when strncat)
+    char* output=(char*)malloc(size+1);   output[0]='\0'; //initialize null (to navigate when strncat)
     //read row by row
     for(i=0;i<row;i++){
         for(j=0;j<colLen;j++){
@@ -250,9 +250,99 @@ char* transPositionDecrypt(char* arr,int colLen,int* readOrder){
             strncat(output,&c,1);
         }
     }
-
     free(transArr);
     return output;
+}
+
+/*no string argument on this func*/
+void findSequence(char* arr,int arrLen,char* searchWord,int wordLen,char* mainArr){  //("ATAHTZ",6,"THAT",4) -->  {1,3,0,4}
+    int mindex=0;   int index=0;
+    int i,j,k;
+    int* missingSeq=calloc(arrLen-wordLen,sizeof(int)); //contains unused index (sequence')
+    int* sequence=calloc(wordLen,sizeof(int)); //contains indexes of arr (represent read order)
+
+    /*fill sequence*/
+    for(i=0;i<wordLen;i++){ // 0~4
+        int found=0;
+        for(j=0;j<arrLen;j++){ // 0~6
+            //duplicate index check
+            int flag=0;
+            for(k=0;k<index;k++)
+                if(sequence[k]==j)
+                    flag=1;
+            if(flag==1)
+                continue;
+
+            //go through searchWord for match
+            if(arr[j]==searchWord[i]){
+                sequence[index++]=j;    found=1;
+                break;
+            }
+        }
+        if(found==0) //all 4 letters need to be found in order to proceed
+            return;
+    }
+
+    /*fill missingSequence*/
+    for(i=0;i<arrLen;i++){ // 0~6
+        int found=0;
+        for(j=0;j<wordLen;j++){ //0~4
+            if(i==sequence[j])
+                found=1;
+        }
+        if(found==0)
+            missingSeq[mindex++]=i;
+    }
+
+    //print
+    fputs("\nfound sequence: ",stdout);
+    for(i=0;i<wordLen;i++){
+        printf("%d ",sequence[i]);
+    }puts("");
+    fputs("extr: ",stdout);
+    for(i=0;i<mindex;i++){
+        printf("%d ",missingSeq[i]);
+    }puts("\n");
+
+    free(missingSeq);
+    free(sequence);
+}
+/**
+    print possible sequences using matching word
+    ex) keylen=6 , "THAT" -> find row containing T,H,A,T
+    test all possible transposition using this sequence (total 6 cases)
+**/
+void findReadOrder(char* arr,int colLen,char* that){
+    int size=strlen(arr)-1; //-1 for \n
+    int row=(size%colLen!=0)?size/colLen+1:size/colLen;
+
+    int txtAt=0;
+
+    char transArr[colLen][row];
+    int i,j;
+    for(i=0;i<colLen;i++){ //fills each column
+        int index=colLen-1-i; // n... 3 2 1      LEFT->RIGHT
+        for(j=0;j<row;j++){
+            transArr[index][j]=arr[txtAt++];
+        }
+    }
+
+    char rotateArr[row][colLen];
+    for(i=0;i<row;i++){ //rotate transArr 90 clockwise
+        for(j=0;j<colLen;j++){
+            int index=colLen-1-j;
+            rotateArr[i][j]=transArr[index][i];
+        }
+    }
+    //findSequence, loop and try arr[0] [1] ...
+    for(i=0;i<row;i++){
+        printf("\r<matching pattern found at row %d...>",i);
+        findSequence(rotateArr[i],colLen,that,strlen(that),arr);
+    }
+    /**
+        sequence 412 occurs 3 times, 123 occurs 5 times, 235 occurs 3 times
+        hence when these three connected -> 41235   test 041235 and 412350
+    **/
 }
 
 int main()
@@ -308,7 +398,23 @@ int main()
     for(i=0;i<keyLen;i++)
         order[i]=i;
     char* decryptMsg=transPositionDecrypt(arr,keyLen,order);
-    puts(decryptMsg); free(decryptMsg);
+    puts(decryptMsg);
+    free(decryptMsg);
+
+    /*q6*/puts("---EXERCISE 6---");
+    arr=readFile("cexercise6.txt");
+    keyLen=6;
+    findReadOrder(arr,keyLen,"THE");
+    //findReadOrder(arr,keyLen,"WOULD"); also works (faster)
+
+    int testOrder1[6]={0,4,1,2,3,5};
+    int testOrder2[6]={4,1,2,3,5,0};puts("\rtest {0,4,1,2,3,5}                          ");
+    decryptMsg=transPositionDecrypt(arr,keyLen,testOrder1);
+    puts(decryptMsg);
+    free(decryptMsg);puts("test {4,1,2,3,5,4}");
+    decryptMsg=transPositionDecrypt(arr,keyLen,testOrder2);
+    puts(decryptMsg);
+    free(decryptMsg);
 
     return 0;
 }
