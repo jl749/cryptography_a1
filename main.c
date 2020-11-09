@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <windows.h>
 
 #define MAX_PATTERN_LEN 10   //HAVE, THAT, BE, ARE, IS, AND, THE ....
 #define MAX_PATTERNS 100
@@ -345,6 +346,63 @@ void findReadOrder(char* arr,int colLen,char* that){
     **/
 }
 
+void printFrequency(char* arr){ //print letter frequency in given text
+    int i;  char j;
+    int countArr[26]; //array declared in functions = elements undefined
+    for(i=0;i<sizeof(countArr)/sizeof(int);i++) //set elements 0
+        countArr[i]=0;
+    for(i=0;i<strlen(arr);i++)
+        for(j=65;j<91;j++)
+            if(j==arr[i]){
+                countArr[j-65]+=1;
+                break; //next letter
+            }
+
+    for(i=0;i<sizeof(countArr)/sizeof(int);i++)
+        printf("%2c: %3d   ",i+65,countArr[i]);
+    puts("");
+}
+
+//code from https://stackoverflow.com/questions/29574849/how-to-change-text-color-and-console-color-in-codeblocks
+void SetColor(int ForgC)
+{
+     WORD wColor;
+                          //We will need this handle to get the current background attribute
+     HANDLE hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+     CONSOLE_SCREEN_BUFFER_INFO csbi;
+
+                           //We use csbi for the wAttributes word.
+     if(GetConsoleScreenBufferInfo(hStdOut, &csbi))
+     {
+                     //Mask out all but the background attribute, and add in the forgournd color
+          wColor = (csbi.wAttributes & 0xF0) + (ForgC & 0x0F);
+          SetConsoleTextAttribute(hStdOut, wColor);
+     }
+     return;
+}
+void testSubstitut(char* arr,char (*substit)[2],int len){
+    int i,j;
+    for(i=0;i<strlen(arr);i++){
+        int flag=0;
+        for(j=0;j<len;j++){
+                //printf("compare %c, %c\n",arr[i],substit[j][0]);
+            if(arr[i]==substit[j][0]){
+                if(substit[j][1]=='|')  //'|' won't be seen
+                    SetColor(0);
+                else
+                    SetColor(12);
+                printf("%c",substit[j][1]);
+                SetColor(15);
+                flag=1;
+                break;
+            }
+        }
+        if(flag==0)
+            printf("%c",arr[i]);    //when no match
+    }
+    puts("");
+}
+
 int main()
 {
     int i;
@@ -368,7 +426,7 @@ int main()
     printPatterns(patterns4);
 
     for(i=0; strcmp(patterns4[i].patterns,"") && i!=MAX_PATTERNS ;i++){  //FOR EVERY ELEMENT IN PATTERN ARRAY
-        char* suspectedKey=keyFrom(patterns4[i].patterns,plaintxt); //assuming plaintxt matches pattern get corresponding key
+        char* suspectedKey=keyFrom(patterns4[i].patterns,plaintxt); //assuming plaintxt matches given pattern get corresponding key
         printf("\nsubstituting ciphertxt(%s) on plaintxt(%s), key=%s\n",patterns4[i].patterns,plaintxt,suspectedKey);
         decryptKey(arr,suspectedKey,patterns4[i].indexes,keyLen-strlen(plaintxt),minOccur);
 
@@ -384,7 +442,7 @@ int main()
     printPatterns(patterns3);
 
     for(i=0; strcmp(patterns3[i].patterns,"") && i!=MAX_PATTERNS ;i++){  //FOR EVERY ELEMENT IN PATTERN ARRAY
-        char* suspectedKey=keyFrom(patterns3[i].patterns,plaintxt); //assuming plaintxt matches pattern get corresponding key
+        char* suspectedKey=keyFrom(patterns3[i].patterns,plaintxt); //assuming plaintxt matches given pattern, get corresponding key
         printf("\nsubstituting ciphertxt(%s) on plaintxt(%s), key=%s\n",patterns3[i].patterns,plaintxt,suspectedKey);
         decryptKey(arr,suspectedKey,patterns3[i].indexes,keyLen-strlen(plaintxt),minOccur);
 
@@ -416,5 +474,48 @@ int main()
     puts(decryptMsg);
     free(decryptMsg);
 
+    /*q7*/puts("---EXERCISE 7---");
+    arr=readFile("cexercise7.txt");
+    printFrequency(arr);
+    /**
+    J:152, L:82, F:72, H:59, G:55  --> J=|, L=E, F=T, H=A
+    A;0, C:0, K:1, T:0  --> k=Z,Q,J,X
+    */
+    char substit1[4][2]={{'J','|'}, {'L','E'}, {'F','T'}, {'H','I'}};
+    testSubstitut(arr,substit1,4);
+    /**
+    repeating pattern TME found HENCE, M=H
+    */
+    char substit2[5][2]={{'J','|'},{'L','E'},{'F','T'},{'H','I'},{'M','H'}};
+    testSubstitut(arr,substit2,5);
+    /**
+    pattern THEIO found HENCE, O=R
+    */
+    char substit3[6][2]={{'J','|'},{'L','E'},{'F','T'},{'H','I'},{'M','H'},{'O','R'}};
+    testSubstitut(arr,substit3,6);
+    /**
+    word QETTER found HENCE, Q=L (LETTER)
+    assuming Q=L QENTHER --> LEATHER    HENCE, N=A
+    */
+    char substit4[8][2]={{'J','|'},{'L','E'},{'F','T'},{'H','I'},{'M','H'},{'O','R'},{'Q','L'},{'N','A'}};
+    testSubstitut(arr,substit4,8);
+    /**
+    word THIG found HENCE, G=S
+    thiPD leather -> THICK LEATTER  HENCE, P=C D=K
+    */
+    char substit5[11][2]={{'J','|'},{'L','E'},{'F','T'},{'H','I'},{'M','H'},{'O','R'},{'Q','L'},{'N','A'},{'G','S'},{'P','C'},{'D','K'}};
+    testSubstitut(arr,substit5,11);
+    /**
+    sooVer or later HENCE, V=N
+    can Xo RithoIt -> can do without HENCE, X=D R=W I=U
+    YnlW HENCE, W=Y Y=O
+    */
+    char substit6[17][2]={{'J','|'},{'L','E'},{'F','T'},{'H','I'},{'M','H'},{'O','R'},{'Q','L'},{'N','A'},{'G','S'},{'P','C'},{'D','K'},{'V','N'},{'X','D'},{'R','W'},{'I','U'},{'W','Y'},{'Y','O'}};
+    testSubstitut(arr,substit6,17);
+    /**
+    B=M E=F S=P U=G |=B Z=V K=Z
+    */
+    char substit7[24][2]={{'J','|'},{'L','E'},{'F','T'},{'H','I'},{'M','H'},{'O','R'},{'Q','L'},{'N','A'},{'G','S'},{'P','C'},{'D','K'},{'V','N'},{'X','D'},{'R','W'},{'I','U'},{'W','Y'},{'Y','O'},{'B','M'},{'E','F'},{'S','P'},{'U','G'},{'|','B'},{'Z','V'},{'K','Z'}};
+    testSubstitut(arr,substit7,24);
     return 0;
 }
