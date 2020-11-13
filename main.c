@@ -1,3 +1,9 @@
+/**
+Cryptography A1
+author: Jungmoo Lee (jl749)
+last update: 11/11/2020
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -142,7 +148,7 @@ void decryptKey(char* arr,char* key,int* fixedIndex,int r,int minOccur){ //r=unk
     int maxNum=0;
     char outputString[MAX_STRING_LEN],outputKey[MAX_KEY_LEN];
     while(startkey[strlen(startkey)-1]!=alpEnd+1){ //while key is not endkey
-        for(i=0;i<26;i++){ //every loop increase key (AAA -> AAB)
+        for(i=0;i<26;i++){ //every loop increase key (AAA -> AAB -> AAC -> AAD .... ZZZ)
             int skip=0,take=0;  tested++;
 
             for(j=0;j<r+strlen(key);j++){ //merge known key into mergedKey
@@ -160,11 +166,11 @@ void decryptKey(char* arr,char* key,int* fixedIndex,int r,int minOccur){ //r=unk
                 OF {3,4}  HAVE {2,3,4,5}
            **/
             printf("\rsearching...%d tested",tested);
-            char* decryptedTXT=vigenereCipher(arr,mergedKey);
-            PATTERNS* pattINdecrypt=findPatterns(decryptedTXT,strlen(key)+r,strlen(key),minOccur);
+            char* decryptedTXT=vigenereCipher(arr,mergedKey); //each decrypted msg
+            PATTERNS* pattINdecrypt=findPatterns(decryptedTXT,strlen(key)+r,strlen(key),minOccur); //you find patterns
 
-            int patternNum=getPatternTotal(pattINdecrypt);
-            if(patternNum>maxNum){
+            int patternNum=getPatternTotal(pattINdecrypt); //count total
+            if(patternNum>maxNum){ //find best fitting key (the one has the most matching words)
                 maxNum=patternNum;
                 strcpy(outputKey,mergedKey);
                 strcpy(outputString,decryptedTXT);
@@ -255,6 +261,11 @@ char* transPositionDecrypt(char* arr,int colLen,int* readOrder){
     return output;
 }
 
+/**
+    print possible sequences using matching word
+    ex) keylen=6 , "THAT" -> find row containing T,H,A,T
+    test all possible transposition using this sequence (total 6 cases)
+**/
 /*no string argument on this func*/
 void findSequence(char* arr,int arrLen,char* searchWord,int wordLen,char* mainArr){  //("ATAHTZ",6,"THAT",4) -->  {1,3,0,4}
     int mindex=0;   int index=0;
@@ -308,11 +319,6 @@ void findSequence(char* arr,int arrLen,char* searchWord,int wordLen,char* mainAr
     free(missingSeq);
     free(sequence);
 }
-/**
-    print possible sequences using matching word
-    ex) keylen=6 , "THAT" -> find row containing T,H,A,T
-    test all possible transposition using this sequence (total 6 cases)
-**/
 void findReadOrder(char* arr,int colLen,char* that){
     int size=strlen(arr)-1; //-1 for \n
     int row=(size%colLen!=0)?size/colLen+1:size/colLen;
@@ -340,10 +346,6 @@ void findReadOrder(char* arr,int colLen,char* that){
         printf("\r<matching pattern found at row %d...>",i);
         findSequence(rotateArr[i],colLen,that,strlen(that),arr);
     }
-    /**
-        sequence 412 occurs 3 times, 123 occurs 5 times, 235 occurs 3 times
-        hence when these three connected -> 41235   test 041235 and 412350
-    **/
 }
 
 void printFrequency(char* arr){ //print letter frequency in given text
@@ -362,7 +364,6 @@ void printFrequency(char* arr){ //print letter frequency in given text
         printf("%2c: %3d   ",i+65,countArr[i]);
     puts("");
 }
-
 //code from https://stackoverflow.com/questions/29574849/how-to-change-text-color-and-console-color-in-codeblocks
 void SetColor(int ForgC)
 {
@@ -385,7 +386,6 @@ void testSubstitut(char* arr,char (*substit)[2],int len){
     for(i=0;i<strlen(arr);i++){
         int flag=0;
         for(j=0;j<len;j++){
-                //printf("compare %c, %c\n",arr[i],substit[j][0]);
             if(arr[i]==substit[j][0]){
                 if(substit[j][1]=='|')  //'|' won't be seen
                     SetColor(0);
@@ -406,10 +406,18 @@ void testSubstitut(char* arr,char (*substit)[2],int len){
 int main()
 {
     int i;
+/**
+Caesar cipher with shift 1 to 26(0) printed all out
+then read through the result until I found a readable format
+(readable text was found at shift 23)
+*/
     /*q1*/puts("---EXERCISE 1---");
     char* arr=readFile("cexercise1.txt");
     caesarCipher(arr);
 
+/**
+shift each letter by its corresponding key index
+*/
     /*q2*/puts("---EXERCISE 2---");
     char* key="TESSOFTHEDURBERVILLES";
     arr=readFile("cexercise2.txt");
@@ -417,6 +425,16 @@ int main()
     printf("key: %s\n%s\n",key,answer);
     free(answer);
 
+/**
+Given that keylen=6, I made mX6 matrix and found all repeating patterns on the same indexes of each row
+(e.g EIBV on index { 2  3  4  5 } occurs twice throughout the matrix).
+Assuming one of those patterns is matching with suspected word such as "THE","HAVE","WOULD" (frequent English word)
+I replace each index of the key with corresponding key and brute force the rest.
+In this question I looked for ¡°THAT¡± using length 4 patterns as it needs to test 26^2 cases each.
+For each key I perform Vigenere decryption and count total matching patterns.
+(The message containing the most matching pattern is the correctly decrypted plaintext)
+(best fitting key=ULLBBC)
+*/
     /*q3*/puts("---EXERCISE 3---");
     arr=readFile("cexercise3.txt");
     int keyLen=6;   int minOccur=2;
@@ -433,6 +451,15 @@ int main()
         free(suspectedKey);
     }
 
+/**
+Same as q5 I looked for all possible matching patterns in mX4 ,mX5, mX6 matrixes.
+and looked for corresponding keys using frequent English words (¡°THE¡±, ¡°THAT¡±, ¡°HAVE¡±).
+In this case I was lucky so that I could find my answer on my first attempt mX4.
+Pattern ODD: { 0  1  2 } had the most repeating frequency 6, assuming it matches plain text ¡°THE¡±
+I brute forced the rest 26^1 and decrypted cipher text using each key.
+The message containing the most matching pattern is the correctly decrypted plaintext.
+(best fitting key = VWZM )
+*/
     /*q4*/puts("---EXERCISE 4---");
     arr=readFile("cexercise4.txt");
     keyLen=4;   minOccur=5; //too many for 2, increased threshold to 3
@@ -449,6 +476,10 @@ int main()
         free(suspectedKey);
     }
 
+/**
+Assuming keylen=4 (Again I got it right on my first attempt)
+I filled each column evenly (same depths) and read row by row (left to right 0 1 2 3)
+*/
     /*q5*/puts("---EXERCISE 5---");
     arr=readFile("cexercise5.txt");
     keyLen=4;
@@ -459,10 +490,19 @@ int main()
     puts(decryptMsg);
     free(decryptMsg);
 
+/**
+"THE" is the most frequent English word. Hence, I looked for rows containing letters T,H,E
+and connected the frequent indexes
+(sequence 412 occurs 3 times, 123 occurs 5 times, 235 occurs 3 times --> read sequence is either 041235 or 412350)
+*/
     /*q6*/puts("---EXERCISE 6---");
     arr=readFile("cexercise6.txt");
     keyLen=6;
     findReadOrder(arr,keyLen,"THE");
+    /**
+        sequence 412 occurs 3 times, 123 occurs 5 times, 235 occurs 3 times
+        hence when these three connected -> 41235   test 041235 and 412350
+    **/
     //findReadOrder(arr,keyLen,"WOULD"); also works (faster)
 
     int testOrder1[6]={0,4,1,2,3,5};
@@ -477,30 +517,30 @@ int main()
     /*q7*/puts("---EXERCISE 7---");
     arr=readFile("cexercise7.txt");
     printFrequency(arr);
-    /**
+    /** use English letter frequency to deduce
     J:152, L:82, F:72, H:59, G:55  --> J=|, L=E, F=T, H=A
     A;0, C:0, K:1, T:0  --> k=Z,Q,J,X
     */
     char substit1[4][2]={{'J','|'}, {'L','E'}, {'F','T'}, {'H','I'}};
     testSubstitut(arr,substit1,4);
     /**
-    repeating pattern TME found HENCE, M=H
+    repeating pattern tMe found HENCE, M=H
     */
     char substit2[5][2]={{'J','|'},{'L','E'},{'F','T'},{'H','I'},{'M','H'}};
     testSubstitut(arr,substit2,5);
     /**
-    pattern THEIO found HENCE, O=R
+    pattern theiO found HENCE, O=R
     */
     char substit3[6][2]={{'J','|'},{'L','E'},{'F','T'},{'H','I'},{'M','H'},{'O','R'}};
     testSubstitut(arr,substit3,6);
     /**
-    word QETTER found HENCE, Q=L (LETTER)
-    assuming Q=L QENTHER --> LEATHER    HENCE, N=A
+    word Qetter found HENCE, Q=L (LETTER)
+    assuming Q=L QeNther --> LEATHER    HENCE, N=A
     */
     char substit4[8][2]={{'J','|'},{'L','E'},{'F','T'},{'H','I'},{'M','H'},{'O','R'},{'Q','L'},{'N','A'}};
     testSubstitut(arr,substit4,8);
     /**
-    word THIG found HENCE, G=S
+    word thiG found HENCE, G=S
     thiPD leather -> THICK LEATTER  HENCE, P=C D=K
     */
     char substit5[11][2]={{'J','|'},{'L','E'},{'F','T'},{'H','I'},{'M','H'},{'O','R'},{'Q','L'},{'N','A'},{'G','S'},{'P','C'},{'D','K'}};
